@@ -11,7 +11,7 @@ pytest==6.1.2
 numpy==1.19.4
 pandas==1.1.4
 torchvision==0.8.1
-pytorch_lightning==1.0.3
+pytorch_lightning==1.1.0
 Pillow==8.0.1
 scikit_learn==0.23.2
 adabound==0.0.5

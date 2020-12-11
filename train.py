@@ -1,5 +1,5 @@
-import os
 import warnings
+from pathlib import Path
 
 import hydra
 import pytorch_lightning as pl
@@ -8,7 +8,7 @@ from omegaconf import DictConfig
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 
 from src.utils.technical_utils import load_obj, flatten_omegaconf
-from src.utils.utils import set_seed, save_useful_info
+from src.utils.utils import set_seed, save_useful_info, check_dir
 
 warnings.filterwarnings('ignore')
 
@@ -25,7 +25,6 @@ def run(cfg: DictConfig) -> None:
     set_seed(cfg.training.seed)
     hparams = flatten_omegaconf(cfg)
 
-    cfg.callbacks.model_checkpoint.params.filepath = os.getcwd() + cfg.callbacks.model_checkpoint.params.filepath
     callbacks = []
     for callback in cfg.callbacks.other_callbacks:
         if callback.params:
@@ -40,11 +39,10 @@ def run(cfg: DictConfig) -> None:
             loggers.append(load_obj(logger.class_name)(**logger.params))
 
     callbacks.append(EarlyStopping(**cfg.callbacks.early_stopping.params))
+    callbacks.append(ModelCheckpoint(**cfg.callbacks.model_checkpoint.params))
 
     trainer = pl.Trainer(
         logger=loggers,
-        # early_stop_callback=EarlyStopping(**cfg.callbacks.early_stopping.params),
-        checkpoint_callback=ModelCheckpoint(**cfg.callbacks.model_checkpoint.params),
         callbacks=callbacks,
         **cfg.trainer,
     )
@@ -55,21 +53,21 @@ def run(cfg: DictConfig) -> None:
 
     if cfg.general.save_pytorch_model:
         if cfg.general.save_best:
-            best_path = trainer.checkpoint_callback.best_model_path  # type: ignore
+            best_path = Path(trainer.checkpoint_callback.best_model_path)  # type: ignore
             # extract file name without folder and extension
-            save_name = best_path.split('/')[-1][:-5]
+            save_name = best_path.stem
             model = model.load_from_checkpoint(best_path, hparams=hparams, cfg=cfg, strict=False)
-            model_name = f'saved_models/{save_name}.pth'
+            model_name = f'saved_models/best_{save_name}.pth'
             torch.save(model.model.state_dict(), model_name)
         else:
-            os.makedirs('saved_models', exist_ok=True)
+            check_dir('saved_models')
             model_name = 'saved_models/last.pth'
             torch.save(model.model.state_dict(), model_name)
 
 
 @hydra.main(config_path='conf', config_name='config')
 def run_model(cfg: DictConfig) -> None:
-    os.makedirs('logs', exist_ok=True)
+    check_dir('logs')
     print(cfg.pretty())
     if cfg.general.log_code:
         save_useful_info()

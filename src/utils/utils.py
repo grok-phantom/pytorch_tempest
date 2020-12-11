@@ -1,6 +1,7 @@
 import os
 import random
 import shutil
+from pathlib import Path
 
 import hydra
 import numpy as np
@@ -29,3 +30,7 @@ def save_useful_info() -> None:
         os.path.join(hydra.utils.get_original_cwd(), 'train.py'),
         os.path.join(hydra.utils.get_original_cwd(), os.getcwd(), 'code'),
     )
+
+
+def check_dir(path):
+    Path(path).mkdir(exist_ok=True, parents=True)
