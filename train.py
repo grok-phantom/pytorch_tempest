@@ -7,8 +7,8 @@ import torch
 from omegaconf import DictConfig
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 
-from src.utils.technical_utils import load_obj, flatten_omegaconf
-from src.utils.utils import set_seed, save_useful_info, check_dir
+from src.utils.technical_utils import load_obj, flatten_omegaconf, convert_to_jit
+from src.utils.utils import set_seed, save_useful_info
 
 warnings.filterwarnings('ignore')
 
@@ -23,6 +23,7 @@ def run(cfg: DictConfig) -> None:
 
     """
     set_seed(cfg.training.seed)
+    run_name = os.path.basename(os.getcwd())
     hparams = flatten_omegaconf(cfg)
 
     callbacks = []
@@ -36,6 +37,8 @@ def run(cfg: DictConfig) -> None:
     loggers = []
     if cfg.logging.log:
         for logger in cfg.logging.loggers:
+            if 'experiment_name' in logger.params.keys():
+                logger.params['experiment_name'] = run_name
             loggers.append(load_obj(logger.class_name)(**logger.params))
 
     callbacks.append(EarlyStopping(**cfg.callbacks.early_stopping.params))
@@ -53,16 +56,27 @@ def run(cfg: DictConfig) -> None:
 
     if cfg.general.save_pytorch_model:
         if cfg.general.save_best:
+<<<<<<< HEAD
             best_path = Path(trainer.checkpoint_callback.best_model_path)  # type: ignore
             # extract file name without folder and extension
             save_name = best_path.stem
             model = model.load_from_checkpoint(best_path, hparams=hparams, cfg=cfg, strict=False)
             model_name = f'saved_models/best_{save_name}.pth'
+=======
+            best_path = trainer.checkpoint_callback.best_model_path  # type: ignore
+            # extract file name without folder
+            save_name = os.path.basename(os.path.normpath(best_path))
+            model = model.load_from_checkpoint(best_path, hparams=hparams, cfg=cfg, strict=False)
+            model_name = f'saved_models/{save_name}'.replace('.ckpt', '.pth')
+>>>>>>> upstream/master
             torch.save(model.model.state_dict(), model_name)
         else:
             check_dir('saved_models')
             model_name = 'saved_models/last.pth'
             torch.save(model.model.state_dict(), model_name)
+
+    if cfg.general.convert_to_jit:
+        convert_to_jit(model, save_name, cfg)
 
 
 @hydra.main(config_path='conf', config_name='config')
